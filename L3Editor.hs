@@ -5,7 +5,7 @@ import Graphics.Rendering.OpenGL
 import Graphics.UI.GLUT
 import System.Environment
 
-import GameState
+import EditorState
 
 reshape :: Size -> IO ()
 reshape s@(Size w h) = do
@@ -25,21 +25,18 @@ reshape s@(Size w h) = do
 main :: IO ()
 main = do
     args <- getArgs
-    if length args /= 1 then putStrLn "Filename expected as an argument."
+    if length args /= 1 then putStrLn "Result filename expected as an argument."
     else do
         getArgsAndInitialize
         initialDisplayMode $= [DoubleBuffered, WithDepthBuffer]
-        createWindow "L3Game"
+        createWindow "L3Editor"
 
-        level <- readFile $ head args
-
-        state <- newIORef $ loadGame level
+        state <- newIORef $ initialEditor $ head args
 
         fullScreen
         displayCallback       $= renderState state
         reshapeCallback       $= Just reshape
         keyboardMouseCallback $= Just (inputHandler state)
-        idleCallback          $= Just (idleHandler state)
         depthFunc             $= Just Less
 
         mainLoop

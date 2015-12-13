@@ -11,25 +11,48 @@ data Point3D = P3D {
     _x :: Int,
     _y :: Int,
     _z :: Int
-} deriving (Eq, Ord, Show)
+} deriving (Eq, Ord, Show, Read)
 
 makeLenses ''Point3D
 
-data Direction = X | Y | Z | XI | YI | ZI deriving (Eq, Ord, Show)
+data Direction = X | Y | Z | XI | YI | ZI deriving (Eq, Ord, Show, Read)
+
+opposite :: Direction -> Direction
+opposite X = XI
+opposite Y = YI
+opposite Z = ZI
+opposite XI = X
+opposite YI = Y
+opposite ZI = Z
 
 data Labyrinth = Labyrinth {
     _walls     :: Set (Point3D, Direction),
     _startPos  :: Point3D,
     _finishPos :: Point3D,
     _playerPos :: Point3D
-} deriving (Show)
+} deriving (Show, Read)
 
 makeLenses ''Labyrinth
+
+emptyLabyrinth :: Labyrinth
+emptyLabyrinth = Labyrinth empty (P3D 0 0 0) (P3D 0 0 0) (P3D 0 0 0)
 
 initialLabyrinth :: Labyrinth
 initialLabyrinth = Labyrinth initialWalls (P3D (-3) 0 0) (P3D (-2) 2 1) (P3D (-3) 0 0)
   where
     initialWalls = insert (P3D (-3) 0 0, X) $ insert (P3D 0 1 0, X) $ insert (P3D 0 2 0, X) $ insert (P3D 0 2 0, Z) $ insert (P3D (-1) 2 0, Z) empty
+
+toggleWall :: Direction -> Labyrinth -> Labyrinth
+toggleWall d l = if canMove l (l ^. playerPos) d
+    then toggleWall' insert d
+    else toggleWall' delete d
+  where
+    toggleWall' f X = walls %~ f (l ^. playerPos, X) $ l
+    toggleWall' f Y = walls %~ f (l ^. playerPos, Y) $ l
+    toggleWall' f Z = walls %~ f (l ^. playerPos, Z) $ l
+    toggleWall' f XI = walls %~ f (x %~ subtract 1 $ l ^. playerPos, X) $ l
+    toggleWall' f YI = walls %~ f (y %~ subtract 1 $ l ^. playerPos, Y) $ l
+    toggleWall' f ZI = walls %~ f (z %~ subtract 1 $ l ^. playerPos, Z) $ l
 
 canMove :: Labyrinth -> Point3D -> Direction -> Bool
 canMove l p X  = notMember (p, X) $ l ^. walls
@@ -39,16 +62,16 @@ canMove l p XI = notMember ((x %~ subtract 1 $ p), X) $ l ^. walls
 canMove l p YI = notMember ((y %~ subtract 1 $ p), Y) $ l ^. walls
 canMove l p ZI = notMember ((z %~ subtract 1 $ p), Z) $ l ^. walls
 
+movePlayer :: Direction -> Labyrinth -> Labyrinth
+movePlayer X l = playerPos . x %~ (+1) $ l
+movePlayer Y l = playerPos . y %~ (+1) $ l
+movePlayer Z l = playerPos . z %~ (+1) $ l
+movePlayer XI l = playerPos . x %~ subtract 1 $ l
+movePlayer YI l = playerPos . y %~ subtract 1 $ l
+movePlayer ZI l = playerPos . z %~ subtract 1 $ l
+
 tryMovePlayer :: Direction -> Labyrinth -> Labyrinth
-tryMovePlayer d l = if canMove l (l ^. playerPos) d
-    then case d of
-        X  -> playerPos . x %~ (+1) $ l
-        Y  -> playerPos . y %~ (+1) $ l
-        Z  -> playerPos . z %~ (+1) $ l
-        XI -> playerPos . x %~ subtract 1 $ l
-        YI -> playerPos . y %~ subtract 1 $ l
-        ZI -> playerPos . z %~ subtract 1 $ l
-    else l
+tryMovePlayer d l = if canMove l (l ^. playerPos) d then movePlayer d l else l
 
 renderBox :: GLfloat -> GLfloat -> GLfloat -> GLfloat -> GLfloat -> GLfloat -> 
     Color4 GLfloat -> Color4 GLfloat -> Color4 GLfloat -> IO ()

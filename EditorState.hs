@@ -1,5 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
-module GameState where
+module EditorState where
 
 import Graphics.Rendering.OpenGL
 import Graphics.UI.GLUT
@@ -11,21 +11,21 @@ import System.Exit
 
 import Labyrinth
 
-data GameState = GameState {
+data EditorState = EditorState {
     _labyrinth :: Labyrinth,
     _direction :: Direction,
     _alpha     :: GLfloat,
     _beta      :: GLfloat,
     _distance  :: GLfloat,
-    _counter   :: Int
+    _fileName  :: String
 }
 
-makeLenses ''GameState
+makeLenses ''EditorState
 
-loadGame :: String -> GameState
-loadGame s = GameState (read s) X 45 90 3 0
+initialEditor :: String -> EditorState
+initialEditor = EditorState emptyLabyrinth X 45 90 3
 
-renderState :: IORef GameState -> IO ()
+renderState :: IORef EditorState -> IO ()
 renderState state = do
     gs <- readIORef state
     clear [ColorBuffer, DepthBuffer]
@@ -72,37 +72,34 @@ getDirection ZI KeyDown  = XI
 getDirection ZI KeyLeft  = Y
 getDirection ZI KeyRight = YI
 
-isFalling :: GameState -> Bool
-isFalling s = canMove (s ^. labyrinth) (s ^. labyrinth . playerPos) (s ^. direction)
-
-inputHandler :: IORef GameState -> KeyboardMouseCallback
+inputHandler :: IORef EditorState -> KeyboardMouseCallback
 inputHandler state key ks m p = do
     gs <- readIORef state
     if ks == Down then case m of
-        Modifiers Up Up Up -> if not (isFalling gs) then do
-            case key of
-                Char 'x'            -> writeIORef state (direction .~ X $ gs)
-                Char 'y'            -> writeIORef state (direction .~ Y $ gs)
-                Char 'z'            -> writeIORef state (direction .~ Z $ gs)
-                SpecialKey KeyUp    -> writeIORef state
-                    (labyrinth %~ tryMovePlayer (getDirection (gs ^. direction) KeyUp) $ gs)
-                SpecialKey KeyDown  -> writeIORef state
-                    (labyrinth %~ tryMovePlayer (getDirection (gs ^. direction) KeyDown) $ gs)
-                SpecialKey KeyLeft  -> writeIORef state
-                    (labyrinth %~ tryMovePlayer (getDirection (gs ^. direction) KeyLeft) $ gs)
-                SpecialKey KeyRight -> writeIORef state
-                    (labyrinth %~ tryMovePlayer (getDirection (gs ^. direction) KeyRight) $ gs)
-                _                   -> return ()
-            modifyIORef state $ counter .~ 0
-        else return ()
-        Modifiers Down Up Up -> if not (isFalling gs) then do
-            case key of
-                Char 'X' -> writeIORef state (direction .~ XI $ gs)
-                Char 'Y' -> writeIORef state (direction .~ YI $ gs)
-                Char 'Z' -> writeIORef state (direction .~ ZI $ gs)
-                _        -> return ()
-            modifyIORef state $ counter .~ 0
-        else return ()
+        Modifiers Up Up Up -> case key of
+            Char 'x'            -> writeIORef state (labyrinth %~ toggleWall X $ gs)
+            Char 'y'            -> writeIORef state (labyrinth %~ toggleWall Y $ gs)
+            Char 'z'            -> writeIORef state (labyrinth %~ toggleWall Z $ gs)
+            Char 's'            ->
+                writeIORef state (labyrinth . startPos .~ (gs ^. labyrinth . playerPos) $ gs)
+            Char 'f'            ->
+                writeIORef state (labyrinth . finishPos .~ (gs ^. labyrinth . playerPos) $ gs)
+            SpecialKey KeyUp    -> writeIORef state
+                (labyrinth %~ movePlayer (getDirection (gs ^. direction) KeyUp) $ gs)
+            SpecialKey KeyDown  -> writeIORef state
+                (labyrinth %~ movePlayer (getDirection (gs ^. direction) KeyDown) $ gs)
+            SpecialKey KeyLeft  -> writeIORef state
+                (labyrinth %~ movePlayer (getDirection (gs ^. direction) KeyLeft) $ gs)
+            SpecialKey KeyRight -> writeIORef state
+                (labyrinth %~ movePlayer (getDirection (gs ^. direction) KeyRight) $ gs)
+            _                   -> return ()
+        Modifiers Down Up Up -> case key of
+            Char 'X' -> writeIORef state (labyrinth %~ toggleWall XI $ gs)
+            Char 'Y' -> writeIORef state (labyrinth %~ toggleWall YI $ gs)
+            Char 'Z' -> writeIORef state (labyrinth %~ toggleWall ZI $ gs)
+            Char '<' -> writeIORef state (labyrinth %~ movePlayer (gs ^. direction) $ gs)
+            Char '>' -> writeIORef state (labyrinth %~ movePlayer (opposite (gs ^. direction)) $ gs)
+            _        -> return ()
         Modifiers Up Down Up -> case key of
             SpecialKey KeyUp    -> writeIORef state (alpha    %~ min 90 . (+2)          $ gs)
             SpecialKey KeyDown  -> writeIORef state (alpha    %~ max (-90) . subtract 2 $ gs)
@@ -111,24 +108,17 @@ inputHandler state key ks m p = do
             Char '+'            -> writeIORef state (distance %~ max 1 . subtract 0.2   $ gs)
             Char '-'            -> writeIORef state (distance %~ min 50 . (+0.4)        $ gs)
             Char '\DC1'         -> exit >> exitSuccess
+            Char '\DC3'         -> writeFile (gs ^. fileName) $ show $ 
+                playerPos .~ (gs ^. labyrinth . startPos) $ gs ^. labyrinth
+            Char '\SUB'         -> writeIORef state (direction .~ Z $ gs)
+            Char '\CAN'         -> writeIORef state (direction .~ X $ gs)
+            Char '\EM'          -> writeIORef state (direction .~ Y $ gs)
             _                   -> return ()
+        Modifiers Down Down Up -> case key of
+            Char '\SUB' -> writeIORef state (direction .~ ZI $ gs)
+            Char '\CAN' -> writeIORef state (direction .~ XI $ gs)
+            Char '\EM'  -> writeIORef state (direction .~ YI $ gs)
+            _           -> return ()
         _                    -> return ()
     else return ()
     postRedisplay Nothing
-
-idleHandler :: IORef GameState -> IO ()
-idleHandler state = do
-    gs <- readIORef state
-    if gs ^. labyrinth . playerPos == gs ^. labyrinth . finishPos then do
-        putStrLn "A winner is you!"
-        exit
-        exitSuccess
-    else do
-        if isFalling gs
-            then if gs ^. counter == 25
-                then let gs2 = counter .~ 0 $ gs
-                         gs3 = labyrinth %~ tryMovePlayer (gs ^. direction) $ gs2
-                     in writeIORef state gs3
-                else modifyIORef state $ counter %~ (+1)
-            else return ()
-        postRedisplay Nothing
