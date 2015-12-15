@@ -10,110 +10,61 @@ import Data.Fixed
 import System.Exit
 
 import Labyrinth
+import StateUtils
 
 data GameState = GameState {
     _labyrinth :: Labyrinth,
     _direction :: Direction,
-    _alpha     :: GLfloat,
-    _beta      :: GLfloat,
-    _distance  :: GLfloat,
+    _camera    :: CameraState,
     _counter   :: Int
 }
 
 makeLenses ''GameState
 
 loadGame :: String -> GameState
-loadGame s = GameState (read s) X 45 90 3 0
+loadGame s = GameState (read s) X initialCameraState 0
 
-renderState :: IORef GameState -> IO ()
-renderState state = do
+renderGameState :: IORef GameState -> IO ()
+renderGameState state = do
     gs <- readIORef state
-    clear [ColorBuffer, DepthBuffer]
-    loadIdentity
-    translate $ Vector3 (0 :: GLfloat) 0 $ (- gs ^. distance)
-    rotate (gs ^. alpha) $ Vector3 (1 :: GLfloat) 0 0
-    rotate (gs ^. beta) $ Vector3 (0 :: GLfloat) 1 0
-    case gs ^. direction of
-        X  -> rotate (-90) $ Vector3 (0 :: GLfloat) 0 1
-        Y  -> rotate 180 $ Vector3 (1 :: GLfloat) 0 0
-        Z  -> rotate 90 $ Vector3 (1 :: GLfloat) 0 0
-        XI -> rotate 90 $ Vector3 (0 :: GLfloat) 0 1
-        YI -> return ()
-        ZI -> rotate (-90) $ Vector3 (1 :: GLfloat) 0 0
-    let (x, y, z) = fromPoint $ gs ^. labyrinth . playerPos
-    translate $ Vector3 (-0.5 - x) (-0.5 - y) (-0.5 - z)
-    renderLabyrinth $ gs ^. labyrinth
-    flush
-    swapBuffers
-
-getDirection :: Direction -> SpecialKey -> Direction
-getDirection X KeyUp     = Y
-getDirection X KeyDown   = YI
-getDirection X KeyLeft   = ZI
-getDirection X KeyRight  = Z
-getDirection Y KeyUp     = X
-getDirection Y KeyDown   = XI
-getDirection Y KeyLeft   = Z
-getDirection Y KeyRight  = ZI
-getDirection Z KeyUp     = X
-getDirection Z KeyDown   = XI
-getDirection Z KeyLeft   = YI
-getDirection Z KeyRight  = Y
-getDirection XI KeyUp    = YI
-getDirection XI KeyDown  = Y
-getDirection XI KeyLeft  = ZI
-getDirection XI KeyRight = Z
-getDirection YI KeyUp    = X
-getDirection YI KeyDown  = XI
-getDirection YI KeyLeft  = ZI
-getDirection YI KeyRight = Z
-getDirection ZI KeyUp    = X
-getDirection ZI KeyDown  = XI
-getDirection ZI KeyLeft  = Y
-getDirection ZI KeyRight = YI
+    renderState (gs ^. labyrinth) (gs ^. direction) (gs ^. camera)
 
 isFalling :: GameState -> Bool
 isFalling s = canMove (s ^. labyrinth) (s ^. labyrinth . playerPos) (s ^. direction)
 
+moveByKey :: SpecialKey -> GameState -> GameState
+moveByKey key gs = labyrinth %~ tryMovePlayer (getDirection (gs ^. direction) key) $ gs
+
 inputHandler :: IORef GameState -> KeyboardMouseCallback
-inputHandler state key ks m p = do
-    gs <- readIORef state
-    if ks == Down then case m of
-        Modifiers Up Up Up -> if not (isFalling gs) then do
-            case key of
-                Char 'x'            -> writeIORef state (direction .~ X $ gs)
-                Char 'y'            -> writeIORef state (direction .~ Y $ gs)
-                Char 'z'            -> writeIORef state (direction .~ Z $ gs)
-                SpecialKey KeyUp    -> writeIORef state
-                    (labyrinth %~ tryMovePlayer (getDirection (gs ^. direction) KeyUp) $ gs)
-                SpecialKey KeyDown  -> writeIORef state
-                    (labyrinth %~ tryMovePlayer (getDirection (gs ^. direction) KeyDown) $ gs)
-                SpecialKey KeyLeft  -> writeIORef state
-                    (labyrinth %~ tryMovePlayer (getDirection (gs ^. direction) KeyLeft) $ gs)
-                SpecialKey KeyRight -> writeIORef state
-                    (labyrinth %~ tryMovePlayer (getDirection (gs ^. direction) KeyRight) $ gs)
-                _                   -> return ()
-            modifyIORef state $ counter .~ 0
-        else return ()
-        Modifiers Down Up Up -> if not (isFalling gs) then do
-            case key of
-                Char 'X' -> writeIORef state (direction .~ XI $ gs)
-                Char 'Y' -> writeIORef state (direction .~ YI $ gs)
-                Char 'Z' -> writeIORef state (direction .~ ZI $ gs)
-                _        -> return ()
-            modifyIORef state $ counter .~ 0
-        else return ()
-        Modifiers Up Down Up -> case key of
-            SpecialKey KeyUp    -> writeIORef state (alpha    %~ min 90 . (+2)          $ gs)
-            SpecialKey KeyDown  -> writeIORef state (alpha    %~ max (-90) . subtract 2 $ gs)
-            SpecialKey KeyLeft  -> writeIORef state (beta     %~ flip mod' 360 . (+2)   $ gs)
-            SpecialKey KeyRight -> writeIORef state (beta     %~ flip mod' 360 . (+358) $ gs)
-            Char '+'            -> writeIORef state (distance %~ max 1 . subtract 0.2   $ gs)
-            Char '-'            -> writeIORef state (distance %~ min 50 . (+0.4)        $ gs)
-            Char '\DC1'         -> exit >> exitSuccess
-            _                   -> return ()
-        _                    -> return ()
-    else return ()
+inputHandler state key keyState modifiers _ = do
+    if keyState /= Down then return ()
+    else do
+        modifyIORef state $ camera %~ cameraInputHandler key modifiers
+        gs <- readIORef state
+        case modifiers of
+            Modifiers Up Up Up -> if isFalling gs then return ()
+                else do
+                    case key of
+                        Char 'x' -> modifyIORef state $ direction .~ X
+                        Char 'y' -> modifyIORef state $ direction .~ Y
+                        Char 'z' -> modifyIORef state $ direction .~ Z
+                        SpecialKey k -> if k `elem` [KeyUp, KeyDown, KeyLeft, KeyRight]
+                            then modifyIORef state $ moveByKey k
+                            else return ()
+                        _                   -> return ()
+                    modifyIORef state $ counter .~ 0
+            Modifiers Down Up Up -> if isFalling gs then return ()
+                else do
+                    case key of
+                        Char 'X' -> modifyIORef state $ direction .~ XI
+                        Char 'Y' -> modifyIORef state $ direction .~ YI
+                        Char 'Z' -> modifyIORef state $ direction .~ ZI
+                        _        -> return ()
+                    modifyIORef state $ counter .~ 0
+            Modifiers Up Down Up -> case key of
+                Char '\DC1' -> exit >> exitSuccess
+                _           -> return ()
+            _                    -> return ()
     postRedisplay Nothing
 
 idleHandler :: IORef GameState -> IO ()

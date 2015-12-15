@@ -7,6 +7,8 @@ import Data.Set
 import Graphics.Rendering.OpenGL
 import Graphics.UI.GLUT
 
+import GraphicsUtils
+
 data Point3D = P3D {
     _x :: Int,
     _y :: Int,
@@ -72,21 +74,6 @@ movePlayer ZI l = playerPos . z %~ subtract 1 $ l
 
 tryMovePlayer :: Direction -> Labyrinth -> Labyrinth
 tryMovePlayer d l = if canMove l (l ^. playerPos) d then movePlayer d l else l
-
-renderBox :: GLfloat -> GLfloat -> GLfloat -> GLfloat -> GLfloat -> GLfloat -> 
-    Color4 GLfloat -> Color4 GLfloat -> Color4 GLfloat -> IO ()
-renderBox x y z x' y' z' c1 c2 c3 = do
-    currentColor $= c1
-    renderPrimitive Quads $ mapM_ toVertex [(x, y, z), (x, y, z'), (x, y', z'), (x, y', z),
-        (x', y, z), (x', y, z'), (x', y', z'), (x', y', z)]
-    currentColor $= c2
-    renderPrimitive Quads $ mapM_ toVertex [(x, y, z), (x, y, z'), (x', y, z'), (x', y, z),
-        (x, y', z), (x, y', z'), (x', y', z'), (x', y', z)]
-    currentColor $= c3
-    renderPrimitive Quads $ mapM_ toVertex [(x, y, z), (x, y', z), (x', y', z), (x', y, z),
-        (x, y, z'), (x, y', z'), (x', y', z'), (x', y, z')]
-  where
-    toVertex (x, y, z) = vertex $ Vertex3 x y z
 
 w1c = Color4 0.7 0.7 0.7 1
 w2c = Color4 0.8 0.8 0.8 1

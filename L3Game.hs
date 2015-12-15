@@ -6,21 +6,7 @@ import Graphics.UI.GLUT
 import System.Environment
 
 import GameState
-
-reshape :: Size -> IO ()
-reshape s@(Size w h) = do
-    viewport   $= (Position 0 0, s)
-    matrixMode $= Projection
-    loadIdentity
-    let near   = 0.001
-        far    = 40
-        fov    = 90
-        ang    = (fov * pi) / 360
-        top    = near / (cos ang / sin ang)
-        aspect = fromIntegral w / fromIntegral h
-        right  = top * aspect
-    frustum (-right) right (-top) top near far
-    matrixMode $= Modelview 0
+import GraphicsUtils
 
 main :: IO ()
 main = do
@@ -36,7 +22,7 @@ main = do
         state <- newIORef $ loadGame level
 
         fullScreen
-        displayCallback       $= renderState state
+        displayCallback       $= renderGameState state
         reshapeCallback       $= Just reshape
         keyboardMouseCallback $= Just (inputHandler state)
         idleCallback          $= Just (idleHandler state)
