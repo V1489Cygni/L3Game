@@ -18,6 +18,9 @@ reshape s@(Size w h) = do
     frustum (-right) right (-top) top near far
     matrixMode $= Modelview 0
 
+toVertex :: (GLfloat, GLfloat, GLfloat) -> IO ()
+toVertex (x, y, z) = vertex $ Vertex3 x y z
+
 renderBox :: GLfloat -> GLfloat -> GLfloat -> GLfloat -> GLfloat -> GLfloat -> 
     Color4 GLfloat -> Color4 GLfloat -> Color4 GLfloat -> IO ()
 renderBox x y z x' y' z' c1 c2 c3 = do
@@ -30,5 +33,3 @@ renderBox x y z x' y' z' c1 c2 c3 = do
     currentColor $= c3
     renderPrimitive Quads $ mapM_ toVertex [(x, y, z), (x, y', z), (x', y', z), (x', y, z),
         (x, y, z'), (x, y', z'), (x', y', z'), (x', y, z')]
-  where
-    toVertex (x, y, z) = vertex $ Vertex3 x y z

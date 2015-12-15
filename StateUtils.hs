@@ -20,7 +20,7 @@ data CameraState = CameraState {
 makeLenses ''CameraState
 
 initialCameraState :: CameraState
-initialCameraState = CameraState 45 0 3
+initialCameraState = CameraState 45 0 3.2
 
 renderState :: Labyrinth -> Direction -> CameraState -> IO ()
 renderState labyrinth direction state = do
@@ -78,7 +78,7 @@ cameraInputHandler key modifiers = if modifiers == Modifiers Up Down Up
         SpecialKey KeyLeft  -> beta %~ flip mod' 360 . (+2)
         SpecialKey KeyRight -> beta %~ flip mod' 360 . (+358)
         Char '+'            -> distance %~ max 1 . subtract 0.2
-        Char '-'            -> distance %~ max 1 . subtract 0.2
+        Char '-'            -> distance %~ max 1 . (+0.2)
         Char '\t'           -> const initialCameraState
         _                   -> id
     else id

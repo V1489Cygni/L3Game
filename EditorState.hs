@@ -24,6 +24,9 @@ makeLenses ''EditorState
 initialEditorState :: String -> EditorState
 initialEditorState = EditorState emptyLabyrinth X initialCameraState
 
+loadEditorState :: String -> String -> EditorState
+loadEditorState contents = EditorState (read contents) X initialCameraState
+
 renderEditorState :: IORef EditorState -> IO ()
 renderEditorState state = do
     es <- readIORef state
@@ -45,6 +48,7 @@ inputHandler state key keyState modifiers _ = do
                 Char 'z' -> modifyIORef state $ labyrinth %~ toggleWall Z
                 Char 's' -> modifyIORef state $ labyrinth . startPos .~ player es
                 Char 'f' -> modifyIORef state $ labyrinth . finishPos .~ player es
+                Char 'b' -> modifyIORef state $ labyrinth %~ toggleBox
                 SpecialKey k -> if k `elem` [KeyUp, KeyDown, KeyLeft, KeyRight]
                     then modifyIORef state $ moveByKey k
                     else return ()

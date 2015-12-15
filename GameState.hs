@@ -16,13 +16,14 @@ data GameState = GameState {
     _labyrinth :: Labyrinth,
     _direction :: Direction,
     _camera    :: CameraState,
-    _counter   :: Int
+    _counter   :: Int,
+    _initLab   :: Labyrinth
 }
 
 makeLenses ''GameState
 
 loadGame :: String -> GameState
-loadGame s = GameState (read s) X initialCameraState 0
+loadGame s = GameState (read s) X initialCameraState 0 (read s)
 
 renderGameState :: IORef GameState -> IO ()
 renderGameState state = do
@@ -45,41 +46,52 @@ inputHandler state key keyState modifiers _ = do
             Modifiers Up Up Up -> if isFalling gs then return ()
                 else do
                     case key of
-                        Char 'x' -> modifyIORef state $ direction .~ X
-                        Char 'y' -> modifyIORef state $ direction .~ Y
-                        Char 'z' -> modifyIORef state $ direction .~ Z
+                        Char 'x' -> do
+                            modifyIORef state $ (direction .~ X) . (counter .~ 0)
+                            modifyIORef state $ labyrinth %~ moveBoxes (gs ^. direction)
+                        Char 'y' -> do
+                            modifyIORef state $ (direction .~ Y) . (counter .~ 0)
+                            modifyIORef state $ labyrinth %~ moveBoxes (gs ^. direction)
+                        Char 'z' -> do
+                            modifyIORef state $ (direction .~ Z) . (counter .~ 0)
+                            modifyIORef state $ labyrinth %~ moveBoxes (gs ^. direction)
+                        Char ' ' -> do
+                            modifyIORef state $ labyrinth %~ moveBoxes (gs ^. direction)
+                            modifyIORef state $ counter .~ 0
                         SpecialKey k -> if k `elem` [KeyUp, KeyDown, KeyLeft, KeyRight]
-                            then modifyIORef state $ moveByKey k
+                            then do
+                                modifyIORef state $ (moveByKey k) . (counter .~ 0)
+                                modifyIORef state $ labyrinth %~ moveBoxes (gs ^. direction)
                             else return ()
-                        _                   -> return ()
-                    modifyIORef state $ counter .~ 0
+                        _ -> return ()
             Modifiers Down Up Up -> if isFalling gs then return ()
                 else do
                     case key of
-                        Char 'X' -> modifyIORef state $ direction .~ XI
-                        Char 'Y' -> modifyIORef state $ direction .~ YI
-                        Char 'Z' -> modifyIORef state $ direction .~ ZI
+                        Char 'X' -> modifyIORef state $ (direction .~ XI) . (counter .~ 0)
+                        Char 'Y' -> modifyIORef state $ (direction .~ YI) . (counter .~ 0)
+                        Char 'Z' -> modifyIORef state $ (direction .~ ZI) . (counter .~ 0)
                         _        -> return ()
-                    modifyIORef state $ counter .~ 0
             Modifiers Up Down Up -> case key of
                 Char '\DC1' -> exit >> exitSuccess
+                Char '\DC2' -> do
+                    modifyIORef state $ labyrinth .~ (gs ^. initLab)
+                    modifyIORef state $ (direction .~ X) . (counter .~ 0)
+                    modifyIORef state $ camera .~ initialCameraState
                 _           -> return ()
-            _                    -> return ()
+            _ -> return ()
     postRedisplay Nothing
 
 idleHandler :: IORef GameState -> IO ()
 idleHandler state = do
     gs <- readIORef state
-    if gs ^. labyrinth . playerPos == gs ^. labyrinth . finishPos then do
-        putStrLn "A winner is you!"
-        exit
-        exitSuccess
+    if gs ^. labyrinth . playerPos == gs ^. labyrinth . finishPos then return ()
     else do
         if isFalling gs
             then if gs ^. counter == 25
                 then let gs2 = counter .~ 0 $ gs
                          gs3 = labyrinth %~ tryMovePlayer (gs ^. direction) $ gs2
-                     in writeIORef state gs3
+                         gs4 = labyrinth %~ moveBoxes (gs ^. direction) $ gs3
+                     in writeIORef state gs4
                 else modifyIORef state $ counter %~ (+1)
             else return ()
         postRedisplay Nothing
