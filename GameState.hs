@@ -49,15 +49,9 @@ inputHandler state key keyState modifiers _ = do
             Modifiers Up Up Up -> if isFalling gs && not finished then return ()
                 else do
                     case key of
-                        Char 'x' -> do
-                            modifyIORef state $ (direction .~ X) . (counter .~ 0)
-                            modifyIORef state $ labyrinth %~ moveBoxes (gs ^. direction)
-                        Char 'y' -> do
-                            modifyIORef state $ (direction .~ Y) . (counter .~ 0)
-                            modifyIORef state $ labyrinth %~ moveBoxes (gs ^. direction)
-                        Char 'z' -> do
-                            modifyIORef state $ (direction .~ Z) . (counter .~ 0)
-                            modifyIORef state $ labyrinth %~ moveBoxes (gs ^. direction)
+                        Char 'x' -> modifyIORef state $ (direction .~ X) . (counter .~ 0)
+                        Char 'y' -> modifyIORef state $ (direction .~ Y) . (counter .~ 0)
+                        Char 'z' -> modifyIORef state $ (direction .~ Z) . (counter .~ 0)
                         Char ' ' -> do
                             modifyIORef state $ labyrinth %~ moveBoxes (gs ^. direction)
                             modifyIORef state $ counter .~ 0

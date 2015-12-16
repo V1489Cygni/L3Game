@@ -5,7 +5,7 @@ Move through the labyrinth from the start point (green cube) to the finish one
 (red). You can move forward/backward and left/right but not up and down (you
 will fall if there is nothing under you). You can choose a direction to lead
 down and continue you way, navigating through the remaining dimensions.
-Obviously, you can't move through the walls and boxes (gray cubes). Boxes are
+Obviously, you can't move through walls and boxes (gray cubes). Boxes are
 falling down according to the current gravity vector. They move one unit down,
 each time you make a move, but you've got higher priority to occupy a cell.
 Note that you can't change the gravity vector while you are falling.
