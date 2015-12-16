@@ -87,7 +87,7 @@ inputHandler state key keyState modifiers _ = do
                 Char '\DC2' -> do
                     modifyIORef state $ labyrinth .~ (gs ^. initLab)
                     modifyIORef state $ (direction .~ X) . (counter .~ 0)
-                    modifyIORef state $ camera .~ initialCameraState
+                    modifyIORef state $ pov .~ (gs ^. labyrinth . startPos)
                 _           -> return ()
             _ -> return ()
     postRedisplay Nothing

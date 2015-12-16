@@ -16,13 +16,14 @@ data CameraState = CameraState {
     _beta      :: GLfloat,
     _distance  :: GLfloat,
     _filtered  :: Bool,
-    _filterAll :: Bool
+    _filterAll :: Bool,
+    _showXDown :: Bool
 }
 
 makeLenses ''CameraState
 
 initialCameraState :: CameraState
-initialCameraState = CameraState 45 0 3.2 False False
+initialCameraState = CameraState 45 0 3.2 False False False
 
 getFilter :: Direction -> Point3D -> (Point3D, Direction) -> Bool
 getFilter X p1 (p2, d) = p1 ^. x <= p2 ^. x
@@ -39,25 +40,29 @@ renderState labyrinth direction state pov = do
     translate $ Vector3 (0 :: GLfloat) 0 $ (-state ^. distance)
     rotate (state ^. alpha - 90) $ Vector3 (1 :: GLfloat) 0 0
     rotate (state ^. beta)  $ Vector3 (0 :: GLfloat) 0 1
-    case direction of
-        X  -> do
+    if state ^. showXDown
+        then do
             rotate  90 $ Vector3 (0 :: GLfloat) 1 0
             rotate 270 $ Vector3 (1 :: GLfloat) 0 0
-        Y  -> do
-            rotate 270 $ Vector3 (0 :: GLfloat) 1 0
-            rotate  90 $ Vector3 (0 :: GLfloat) 0 1
-        Z  -> do
-            rotate 180 $ Vector3 (0 :: GLfloat) 1 0
-        XI -> do
-            rotate  90 $ Vector3 (0 :: GLfloat) 1 0
-            rotate 270 $ Vector3 (1 :: GLfloat) 0 0
-            rotate 180 $ Vector3 (0 :: GLfloat) 1 0
-        YI -> do
-            rotate 270 $ Vector3 (0 :: GLfloat) 1 0
-            rotate 270 $ Vector3 (0 :: GLfloat) 0 1
-        ZI -> do
-            rotate 180 $ Vector3 (0 :: GLfloat) 1 0
-            rotate 180 $ Vector3 (1 :: GLfloat) 0 0
+        else case direction of
+            X  -> do
+                rotate  90 $ Vector3 (0 :: GLfloat) 1 0
+                rotate 270 $ Vector3 (1 :: GLfloat) 0 0
+            Y  -> do
+                rotate 270 $ Vector3 (0 :: GLfloat) 1 0
+                rotate  90 $ Vector3 (0 :: GLfloat) 0 1
+            Z  -> do
+                rotate 180 $ Vector3 (0 :: GLfloat) 1 0
+            XI -> do
+                rotate  90 $ Vector3 (0 :: GLfloat) 1 0
+                rotate 270 $ Vector3 (1 :: GLfloat) 0 0
+                rotate 180 $ Vector3 (0 :: GLfloat) 1 0
+            YI -> do
+                rotate 270 $ Vector3 (0 :: GLfloat) 1 0
+                rotate 270 $ Vector3 (0 :: GLfloat) 0 1
+            ZI -> do
+                rotate 180 $ Vector3 (0 :: GLfloat) 1 0
+                rotate 180 $ Vector3 (1 :: GLfloat) 0 0
     let (x, y, z) = fromPoint pov
     translate $ Vector3 (-0.5 - x) (-0.5 - y) (-0.5 - z)
     renderLabyrinth (if state ^. filterAll then const False
@@ -95,5 +100,6 @@ cameraInputHandler key modifiers = if modifiers == Modifiers Up Down Up
         Char '\t'           -> const initialCameraState
         Char '\ACK'         -> (filtered %~ not) . (filterAll .~ False)
         Char '\a'           -> (filterAll %~ not) . (filtered .~ False)
+        Char '\EOT'         -> showXDown %~ not
         _                   -> id
     else id
