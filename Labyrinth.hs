@@ -8,6 +8,7 @@ import Data.List as L (delete)
 import Data.Set as S
 import Graphics.Rendering.OpenGL
 import Graphics.UI.GLUT
+import Prelude hiding (filter)
 
 import GraphicsUtils
 
@@ -54,16 +55,17 @@ emptyLabyrinth :: Labyrinth
 emptyLabyrinth = Labyrinth empty [] (P3D 0 0 0) (P3D 0 0 0) (P3D 0 0 0)
 
 toggleWall :: Direction -> Labyrinth -> Labyrinth
-toggleWall d l = if canMove l (l ^. playerPos) d
-    then toggleWall' insert d
-    else toggleWall' S.delete d
+toggleWall d l = let w = calcWall d in
+    if member w $ l ^. walls
+        then walls %~ S.delete w $ l
+        else walls %~ insert w $ l
   where
-    toggleWall' f X = walls %~ f (l ^. playerPos, X) $ l
-    toggleWall' f Y = walls %~ f (l ^. playerPos, Y) $ l
-    toggleWall' f Z = walls %~ f (l ^. playerPos, Z) $ l
-    toggleWall' f XI = walls %~ f (x %~ subtract 1 $ l ^. playerPos, X) $ l
-    toggleWall' f YI = walls %~ f (y %~ subtract 1 $ l ^. playerPos, Y) $ l
-    toggleWall' f ZI = walls %~ f (z %~ subtract 1 $ l ^. playerPos, Z) $ l
+    calcWall X = (l ^. playerPos, X)
+    calcWall Y = (l ^. playerPos, Y)
+    calcWall Z = (l ^. playerPos, Z)
+    calcWall XI = (x %~ subtract 1 $ l ^. playerPos, X)
+    calcWall YI = (y %~ subtract 1 $ l ^. playerPos, Y)
+    calcWall ZI = (z %~ subtract 1 $ l ^. playerPos, Z)
 
 toggleBox :: Labyrinth -> Labyrinth
 toggleBox l = if (l ^. playerPos) `elem` l ^. boxes
@@ -97,18 +99,18 @@ moveBoxes d l = boxes %~ fmap (\x -> if canMove l x d && move d x /= l ^. player
     then move d x
     else x) $ l
 
-w1c = Color4 0.7 0.7 0.7 1
-w2c = Color4 0.8 0.8 0.8 1
-w3c = Color4 0.9 0.9 0.9 1
+w1c = Color4 0.7 0.7 0.7 0.1
+w2c = Color4 0.8 0.8 0.8 0.1
+w3c = Color4 0.9 0.9 0.9 0.1
 
 renderWall :: (GLfloat, GLfloat, GLfloat) -> Direction -> IO ()
 renderWall (x, y, z) X = renderBox (x + 0.9) y z (x + 1.1) (y + 1) (z + 1) w1c w2c w3c
 renderWall (x, y, z) Y = renderBox x (y + 0.9) z (x + 1) (y + 1.1) (z + 1) w1c w2c w3c
 renderWall (x, y, z) Z = renderBox x y (z + 0.9) (x + 1) (y + 1) (z + 1.1) w1c w2c w3c
 
-renderLabyrinth :: Labyrinth -> IO ()
-renderLabyrinth l = do
-    forM_ (l ^. walls) $ \(p, d) -> renderWall (fromPoint p) d
+renderLabyrinth :: ((Point3D, Direction) -> Bool) -> Labyrinth -> IO ()
+renderLabyrinth p l = do
+    forM_ (filter p $ l ^. walls) $ \(p, d) -> renderWall (fromPoint p) d
     forM_ (l ^. boxes) $ \p -> let (x, y, z) = fromPoint p
         in renderBox (x + 0.1) (y + 0.1) (z + 0.1) (x + 0.9) (y + 0.9) (z + 0.9)
             (Color4 0.3 0.3 0.3 1) (Color4 0.4 0.4 0.4 1) (Color4 0.5 0.5 0.5 1)
@@ -116,11 +118,14 @@ renderLabyrinth l = do
     renderBox (x + 0.11) (y + 0.11) (z + 0.11) (x + 0.89) (y + 0.89) (z + 0.89)
         (Color4 0 0.7 0 1) (Color4 0 0.8 0 1) (Color4 0 0.9 0 1)
     let (x, y, z) = fromPoint $ l ^. finishPos
-    renderBox (x + 0.08) (y + 0.08) (z + 0.08) (x + 0.92) (y + 0.92) (z + 0.92)
-        (Color4 0.7 0 0 1) (Color4 0.8 0 0 1) (Color4 0.9 0 0 1)
+    if l ^. playerPos == l ^. finishPos
+        then renderBox (x + 0.08) (y + 0.08) (z + 0.08) (x + 0.92) (y + 0.92) (z + 0.92)
+            (Color4 0 0 0.7 1) (Color4 0 0 0.8 1) (Color4 0 0 0.9 1)
+        else renderBox (x + 0.08) (y + 0.08) (z + 0.08) (x + 0.92) (y + 0.92) (z + 0.92)
+            (Color4 0.7 0 0 1) (Color4 0.8 0 0 1) (Color4 0.9 0 0 1)
     let (x, y, z) = fromPoint $ l ^. playerPos
     renderBox (x + 0.1) (y + 0.1) (z + 0.1) (x + 0.9) (y + 0.9) (z + 0.9)
-        (Color4 0.7 0.7 0 1) (Color4 0.8 0.8 0 1) (Color4 0.9 0.9 0 5)
+        (Color4 0.7 0.7 0 1) (Color4 0.8 0.8 0 1) (Color4 0.9 0.9 0 1)
     currentColor $= Color4 1 0 0 1
     renderPrimitive Quads $ mapM_ toVertex [(x + 0.09, y + 0.4, z + 0.4),
         (x + 0.09, y + 0.4, z + 0.6), (x + 0.09, y + 0.6, z + 0.6),
@@ -139,7 +144,7 @@ renderLabyrinth l = do
         (x + 0.6, y + 0.4, z + 0.09), (x + 0.4, y + 0.4, z + 0.91),
         (x + 0.4, y + 0.6, z + 0.91), (x + 0.6, y + 0.6, z + 0.91),
         (x + 0.6, y + 0.4, z + 0.91)]
-    currentColor $= Color4 0 0 0 1
+    currentColor $= Color4 1 1 1 1
     renderPrimitive Quads $ mapM_ toVertex [(x + 0.915, y + 0.45, z + 0.45),
         (x + 0.915, y + 0.45, z + 0.55), (x + 0.915, y + 0.55, z + 0.55),
         (x + 0.915, y + 0.55, z + 0.45), (x + 0.45, y + 0.915, z + 0.45),

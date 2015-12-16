@@ -4,7 +4,7 @@ module StateUtils where
 import Graphics.Rendering.OpenGL
 import Graphics.UI.GLUT
 
-import Control.Lens
+import Control.Lens hiding (filtered)
 import Data.IORef
 import Data.Fixed
 import System.Exit
@@ -14,16 +14,26 @@ import Labyrinth
 data CameraState = CameraState {
     _alpha     :: GLfloat,
     _beta      :: GLfloat,
-    _distance  :: GLfloat
+    _distance  :: GLfloat,
+    _filtered  :: Bool,
+    _filterAll :: Bool
 }
 
 makeLenses ''CameraState
 
 initialCameraState :: CameraState
-initialCameraState = CameraState 45 0 3.2
+initialCameraState = CameraState 45 0 3.2 False False
 
-renderState :: Labyrinth -> Direction -> CameraState -> IO ()
-renderState labyrinth direction state = do
+getFilter :: Direction -> Point3D -> (Point3D, Direction) -> Bool
+getFilter X p1 (p2, d) = p1 ^. x <= p2 ^. x
+getFilter Y p1 (p2, d) = p1 ^. y <= p2 ^. y
+getFilter Z p1 (p2, d) = p1 ^. z <= p2 ^. z
+getFilter XI p1 (p2, d) = p1 ^. x >= p2 ^. x + if d == X then 1 else 0
+getFilter YI p1 (p2, d) = p1 ^. y >= p2 ^. y + if d == Y then 1 else 0
+getFilter ZI p1 (p2, d) = p1 ^. z >= p2 ^. z + if d == Z then 1 else 0
+
+renderState :: Labyrinth -> Direction -> CameraState -> Point3D -> IO ()
+renderState labyrinth direction state pov = do
     clear [ColorBuffer, DepthBuffer]
     loadIdentity
     translate $ Vector3 (0 :: GLfloat) 0 $ (-state ^. distance)
@@ -48,9 +58,12 @@ renderState labyrinth direction state = do
         ZI -> do
             rotate 180 $ Vector3 (0 :: GLfloat) 1 0
             rotate 180 $ Vector3 (1 :: GLfloat) 0 0
-    let (x, y, z) = fromPoint $ labyrinth ^. playerPos
+    let (x, y, z) = fromPoint pov
     translate $ Vector3 (-0.5 - x) (-0.5 - y) (-0.5 - z)
-    renderLabyrinth labyrinth
+    renderLabyrinth (if state ^. filterAll then const False
+        else if state ^. filtered
+            then getFilter direction pov
+            else const True) labyrinth
     flush
     swapBuffers
 
@@ -80,5 +93,7 @@ cameraInputHandler key modifiers = if modifiers == Modifiers Up Down Up
         Char '+'            -> distance %~ max 1 . subtract 0.2
         Char '-'            -> distance %~ max 1 . (+0.2)
         Char '\t'           -> const initialCameraState
+        Char '\ACK'         -> (filtered %~ not) . (filterAll .~ False)
+        Char '\a'           -> (filterAll %~ not) . (filtered .~ False)
         _                   -> id
     else id

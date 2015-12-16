@@ -30,7 +30,7 @@ loadEditorState contents = EditorState (read contents) X initialCameraState
 renderEditorState :: IORef EditorState -> IO ()
 renderEditorState state = do
     es <- readIORef state
-    renderState (es ^. labyrinth) (es ^. direction) (es ^. camera)
+    renderState (es ^. labyrinth) (es ^. direction) (es ^. camera) (es ^. labyrinth . playerPos)
 
 moveByKey :: SpecialKey -> EditorState -> EditorState
 moveByKey key es = labyrinth %~ movePlayer (getDirection (es ^. direction) key) $ es
