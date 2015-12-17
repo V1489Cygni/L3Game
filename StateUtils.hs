@@ -67,7 +67,7 @@ renderState labyrinth direction state pov = do
     translate $ Vector3 (-0.5 - x) (-0.5 - y) (-0.5 - z)
     renderLabyrinth (if state ^. filterAll then const False
         else if state ^. filtered
-            then getFilter direction pov
+            then getFilter (if state ^. showXDown then X else direction) pov
             else const True) labyrinth
     flush
     swapBuffers

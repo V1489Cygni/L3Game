@@ -25,7 +25,7 @@ makeLenses ''GameState
 
 loadGame :: String -> GameState
 loadGame s = let l = read s
-    in GameState l X initialCameraState (l ^. playerPos) 0 (read s)
+    in GameState l X initialCameraState (l ^. playerPos) 0 l
 
 renderGameState :: IORef GameState -> IO ()
 renderGameState state = do
@@ -36,7 +36,9 @@ isFalling :: GameState -> Bool
 isFalling s = canMove (s ^. labyrinth) (s ^. labyrinth . playerPos) (s ^. direction)
 
 moveByKey :: SpecialKey -> GameState -> GameState
-moveByKey key gs = labyrinth %~ tryMovePlayer (getDirection (gs ^. direction) key) $ gs
+moveByKey key gs = if gs ^. camera . showXDown
+    then labyrinth %~ tryMovePlayer (getDirection X key) $ gs
+    else labyrinth %~ tryMovePlayer (getDirection (gs ^. direction) key) $ gs
 
 inputHandler :: IORef GameState -> KeyboardMouseCallback
 inputHandler state key keyState modifiers _ = do
